@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if language == 'en' %}Document Verifier{% else %}Dokumentenprüfer{% endif %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .drag-drop {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .drag-drop.dragging {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border-color: #0c5460;
+        }
+        .logo {
+            max-height: 100px;
+            margin: 10px;
+        }
+        .file-name {
+            margin-top: 10px;
+            font-size: 16px;
+            color: #007bff;
+        }
+        .result-badge {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .result-passed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .result-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+        .file-type-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .supported-formats {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text-center mb-4">
+            <img src="/static/ALSTOM.png" alt="Alstom Logo" class="img-fluid logo">
+            <img src="/static/TUB.png" alt="TU Berlin Logo" class="img-fluid logo">
+            <h1 class="display-4">{% if language == 'en' %}Document Verifier{% else %}Dokumentenprüfer{% endif %}</h1>
+        </div>
+
+        <form id="uploadForm" action="/verify" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="language" id="languageInput" value="{{ language }}">
+
+            <div class="mb-4 text-end">
+                <label for="languageSelect" class="form-label">{% if language == 'en' %}Choose Language{% else %}Sprache auswählen{% endif %}:</label>
+                <select id="languageSelect" class="form-select w-auto d-inline-block">
+                    <option value="en" {% if language == 'en' %}selected{% endif %}>English</option>
+                    <option value="de" {% if language == 'de' %}selected{% endif %}>Deutsch</option>
+                </select>
+            </div>
+
+            <div class="drag-drop" id="dropArea">
+                <div class="file-type-icon">📄</div>
+                <p id="dropText">{% if language == 'en' %}Drag and drop your document here or click to upload{% else %}Ziehen Sie Ihr Dokument hierher oder klicken Sie, um es hochzuladen{% endif %}</p>
+                <input type="file" id="fileInput" name="file" accept=".docx,.pdf,.xlsx,.xls,.xltm" style="display: none;" required>
+                <div id="fileName" class="file-name" style="display: none;"></div>
+                <div class="supported-formats">
+                    {% if language == 'en' %}
+                    Supported formats: .docx, .pdf, .xlsx, .xls, .xltm
+                    {% else %}
+                    Unterstützte Formate: .docx, .pdf, .xlsx, .xls, .xltm
+                    {% endif %}
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" id="uploadButton" disabled>
+                {% if language == 'en' %}Verify Document{% else %}Dokument überprüfen{% endif %}
+            </button>
+        </form>
+
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner-border loading-spinner text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">
+                {% if language == 'en' %}
+                Processing document...
+                {% else %}
+                Dokument wird verarbeitet...
+                {% endif %}
+            </p>
+        </div>
+
+        {% if file_name %}
+        <div class="alert alert-info mt-4">
+            <h4 class="alert-heading">{% if language == 'en' %}Uploaded File{% else %}Hochgeladene Datei{% endif %}</h4>
+            <p class="mb-0">{{ file_name }}</p>
+        </div>
+        {% endif %}
+
+        {% if error %}
+        <div class="alert alert-danger mt-3">
+            <h4 class="alert-heading">{% if language == 'en' %}Error{% else %}Fehler{% endif %}</h4>
+            <p class="mb-0">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        {% if results %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="mb-0">{% if language == 'en' %}Verification Results{% else %}Prüfungsergebnisse{% endif %}</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>{% if language == 'en' %}Test{% else %}Test{% endif %}</th>
+                            <th>{% if language == 'en' %}Status{% else %}Status{% endif %}</th>
+                            <th>{% if language == 'en' %}Details{% else %}Einzelheiten{% endif %}</th>
+                            <th>{% if language == 'en' %}Content{% else %}Inhalt{% endif %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for test, result in results.items() %}
+                        {% if test != 'error' %}
+                        <tr>
+                            <td>{{ test.replace('_', ' ').title() }}</td>
+                            <td>
+                                <span class="result-badge {% if result.passed %}result-passed{% else %}result-failed{% endif %}">
+                                    {% if result.passed %}
+                                    ✅ PASSED
+                                    {% else %}
+                                    ❌ FAILED
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>{{ result.details }}</td>
+                            <td>{{ result.content }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <footer class="text-center mt-4">
+            <p>&copy; 2025 open season.</p>
+        </footer>
+    </div>
+
+    <script>
+        const languageSelect = document.getElementById('languageSelect');
+        const languageInput = document.getElementById('languageInput');
+        const uploadForm = document.getElementById('uploadForm');
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const uploadButton = document.getElementById('uploadButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        languageSelect.addEventListener('change', () => {
+            languageInput.value = languageSelect.value;
+            uploadForm.submit();
+        });
+
+        uploadForm.addEventListener('submit', (e) => {
+            if (fileInput.files.length > 0) {
+                loadingIndicator.style.display = 'block';
+                uploadButton.disabled = true;
+            }
+        });
+
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragging');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragging');
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragging');
+            handleFileUpload(e.dataTransfer.files[0]);
+        });
+
+        dropArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            handleFileUpload(e.target.files[0]);
+        });
+
+        function handleFileUpload(file) {
+            if (file) {
+                const validExtensions = ['.docx', '.pdf', '.xlsx', '.xls', '.xltm'];
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                
+                if (validExtensions.includes(fileExtension)) {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    fileInput.files = dataTransfer.files;
+
+                    fileName.style.display = 'block';
+                    fileName.textContent = `{% if language == 'en' %}File Selected{% else %}Ausgewählte Datei{% endif %}: ${file.name}`;
+                    uploadButton.disabled = false;
+                } else {
+                    alert({% if language == 'en' %}
+                        'Invalid file format. Please upload a .docx, .pdf, .xlsx, xltm or .xls file.'
+                    {% else %}
+                        'Ungültiges Dateiformat. Bitte laden Sie eine .docx, .pdf, .xlsx, xltm oder .xls Datei hoch.'
+                    {% endif %});
+                }
+            }
+        }
+    </script>
+</body>
+</html>
